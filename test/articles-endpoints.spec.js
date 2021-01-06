@@ -25,6 +25,16 @@ describe.only('Articles Endpoints', function() {
     afterEach('cleanup', () => db('blogful_articles').truncate())
 
     describe(`GET /articles`, () => {
+        //for when the db table is empty
+        context(`Given no articles`, () => {
+            it(`responds with 200 and an empty list`, () => {
+                return supertest(app)
+                    .get('/articles')
+                    .expect(200, [])
+            })
+        })
+
+        //for when the db table has data
         context('Given there are articles in the database', () => {
             //some test data
             const testArticles = makeArticlesArray()
@@ -35,6 +45,7 @@ describe.only('Articles Endpoints', function() {
                     .into('blogful_articles')
                     .insert(testArticles)
             })
+            
             //assert that the response matches the data we inserted into the db table
             it('GET /articles responds with 200 and all of the articles', () => {
                 return supertest(app)
@@ -45,6 +56,17 @@ describe.only('Articles Endpoints', function() {
     })
 
     describe(`GET /articles/:article_id`, () => {
+        //test for when the db is empty
+        context(`Given no articles`, () => {
+            it(`responds with 404`, () => {
+                const articleId = 123456
+                return supertest(app)
+                    .get(`/articles/${articleId}`)
+                    .expect(404, {error: {message: `Article doesn't exist`}})
+            })
+        })
+
+        //test for when there is data in the db
         context('Given there are articles in the database', () => {
             const testArticles = makeArticlesArray()
 
