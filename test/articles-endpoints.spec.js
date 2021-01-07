@@ -87,7 +87,7 @@ describe('Articles Endpoints', function() {
         })
     })
     
-    describe(`POST /articles`, () => {
+    describe.only(`POST /articles`, () => {
         it(`creates an article, responding with 201 and the new article`, function() {
             this.retries(3)
             const newArticle = {
@@ -115,5 +115,56 @@ describe('Articles Endpoints', function() {
                         .expect(postRes.body)
                 )
         })
+        it(`responds with 400 and an error message when the 'title' is missing`, () => {
+            return supertest(app)
+                .post('/articles')
+                .send({
+                    style: 'Listicle',
+                    content: 'Test new article content...'
+                })
+                .expect(400, {
+                    error: {message: `Missing 'title' in request body`}
+                })
+        })
+        it(`responds with 400 and an error message when the 'content' is missing`, () => {
+            return supertest(app)
+                .post('/articles')
+                .send({
+                    title: 'Test new article',
+                    style: 'Listicle',
+                })
+                .expect(400, {
+                    error: {message: `Missing 'content' in request body`}
+                })
+        })
+        it(`responds with 400 and an error message when the 'style' is missing`, () => {
+            return supertest(app)
+                .post('/articles')
+                .send({
+                    title: 'Test new article',
+                    content: 'Test new article content...'
+                })
+                .expect(400, {
+                    error: {message: `Missing 'style' in request body`}
+                })
+        })
+        //refactored validations tests into ONE:
+        // const requiredFields = ['title', 'style', 'content']
+        // requiredFields.forEach(field => {
+        //     const newArticle = {
+        //         title: 'Test new article',
+        //         style: 'Listicle',
+        //         content: 'Test new article content...'
+        //     }
+        //     it(`responds with 400 and an error message when the '${field}' is missing`, () => {
+        //         delete newArticle[field]
+        //         return supertest(app)
+        //             .post('/articles')
+        //             .send(newArticle)
+        //             .expect(400, {
+        //                 error: {message: `Missing '${field}' in request body`}
+        //             })
+        //     })
+        // })
     })
 })
