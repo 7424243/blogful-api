@@ -2,7 +2,7 @@ const {expect} = require('chai')
 const knex = require('knex')
 const supertest = require('supertest')
 const app = require('../src/app')
-const {makeArticlesArray} = require('./articles.fixtures')
+const {makeArticlesArray, makeMaliciousArticle} = require('./articles.fixtures')
 
 describe('Articles Endpoints', function() {
     let db
@@ -53,6 +53,23 @@ describe('Articles Endpoints', function() {
                     .expect(200, testArticles)
             })
         })
+        context(`Given an XSS attack article`, () => {
+            const {maliciousArticle, expectedArticle} = makeMaliciousArticle()
+            beforeEach(`insert malicious article`, () => {
+                return db   
+                    .into('blogful_articles')
+                    .insert([maliciousArticle])
+            })
+            it(`removes XSS attack content`, () => {
+                return supertest(app)
+                    .get(`/articles`)
+                    .expect(200)
+                    .expect(res => {
+                        expect(res.body[0].title).to.eql(expectedArticle.title)
+                        expect(res.body[0].content).to.eql(expectedArticle.content)
+                    })
+            })
+        })
     })
 
     describe(`GET /articles/:article_id`, () => {
@@ -85,9 +102,34 @@ describe('Articles Endpoints', function() {
                     .expect(200, expectedArticle)
             })
         })
+
+        //new context to test for xxs attacks
+        context(`Given an XXS attack article`, () => {
+            const maliciousArticle = {
+                id: 911,
+                title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+                style: 'How-to',
+                content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
+            }
+            beforeEach('insert malicious article', () => {
+                return db
+                    .into('blogful_articles')
+                    .insert([maliciousArticle])
+            })
+            it(`removes XXS attack content`, () => {
+                return supertest(app)
+                    .get(`/articles/${maliciousArticle.id}`)
+                    .expect(200)
+                    .expect(res => {
+                        expect(res.body.title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
+                        expect(res.body.content).to.eql(`Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`)
+                    })
+            })
+        })
     })
     
-    describe.only(`POST /articles`, () => {
+    describe(`POST /articles`, () => {
+        //test for creating a new article and a 201 response
         it(`creates an article, responding with 201 and the new article`, function() {
             this.retries(3)
             const newArticle = {
@@ -115,6 +157,7 @@ describe('Articles Endpoints', function() {
                         .expect(postRes.body)
                 )
         })
+        //validation test for title
         it(`responds with 400 and an error message when the 'title' is missing`, () => {
             return supertest(app)
                 .post('/articles')
@@ -126,6 +169,7 @@ describe('Articles Endpoints', function() {
                     error: {message: `Missing 'title' in request body`}
                 })
         })
+        //validation test for content
         it(`responds with 400 and an error message when the 'content' is missing`, () => {
             return supertest(app)
                 .post('/articles')
@@ -137,6 +181,7 @@ describe('Articles Endpoints', function() {
                     error: {message: `Missing 'content' in request body`}
                 })
         })
+        //validation test for style
         it(`responds with 400 and an error message when the 'style' is missing`, () => {
             return supertest(app)
                 .post('/articles')
@@ -166,5 +211,16 @@ describe('Articles Endpoints', function() {
         //             })
         //     })
         // })
+        it(`removes XSS attack content from response`, () => {
+            const {maliciousArticle, expectedArticle} = makeMaliciousArticle()
+            return supertest(app)
+                .post(`/articles`)
+                .send(maliciousArticle)
+                .expect(201)
+                .expect(res => {
+                    expect(res.body.title).to.eql(expectedArticle.title)
+                    expect(res.body.content).to.eql(expectedArticle.content)
+                })
+        })
     })
 })
