@@ -2,6 +2,7 @@ const express = require('express')
 const xss = require('xss')
 const ArticlesService = require('./articles-service')
 const path = require('path')
+const { json } = require('express')
 
 const articlesRouter = express.Router()
 const jsonParser = express.json()
@@ -64,11 +65,11 @@ articlesRouter
         next()
       })
       .catch(next)
-  })
-  .get((req, res, next) => {
-    res.json(serializeArticle(res.article))
-  })
-  .delete((req, res, next) => {
+    })
+    .get((req, res, next) => {
+        res.json(serializeArticle(res.article))
+    })
+    .delete((req, res, next) => {
     ArticlesService.deleteArticle(
       req.app.get('db'),
       req.params.article_id
@@ -77,6 +78,26 @@ articlesRouter
         res.status(204).end()
       })
       .catch(next)
-  })
+    })
+    .patch(jsonParser, (req, res, next) => {
+        const {title, content, style} = req.body
+        const articleToUpdate = {title, content, style}
+        const numberOfValues = Object.values(articleToUpdate).filter(Boolean).length
+        if(numberOfValues === 0) {
+            return res.status(400).json({
+                error: {message: `Request body must contain either 'title', 'style', or 'content'`}
+            })
+        }
+        ArticlesService.updateArticle(
+            req.app.get('db'),
+            req.params.article_id,
+            articleToUpdate
+        )
+            .then(numRowsAffected => {
+                res.status(204).end()
+            })
+            .catch(next)
+        
+    })
 
 module.exports = articlesRouter
