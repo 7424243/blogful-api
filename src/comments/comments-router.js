@@ -3,12 +3,13 @@ const express = require('express')
 const xss = require('xss')
 const CommentsService = require('./comments-service')
 const app = require('../app')
+const { json } = require('express')
 
 const commentsRouter = express.Router()
 const jsonParser = express.json()
 
 const serializeComment = comment => ({
-    id: commend.id,
+    id: comment.id,
     text: xss(comment.text),
     date_commented: comment.date_commented,
     article_id: comment.article_id,
@@ -46,3 +47,57 @@ commentsRouter
             })
             .catch(next)
     })
+
+commentsRouter
+    .route('/:comment_id')
+    .all((req, res, next) => {
+        CommentsService.getById(
+            req.app.get('db'),
+            req.params.comment_id
+        )
+            .then(comment => {
+                if(!comment) {
+                    res.status(400).json({
+                        error: {message: `Comment doesn't exist`}
+                    })
+                }
+                res.comment = comment
+                next()
+            })
+            .catch(next)
+    })
+    .get((req, res, next) => {
+        res.json(serializeComment(res.comment))
+    })
+    .delete((req, res, next) => {
+        CommentsService.deleteComment(
+            req.app.get('db'),
+            req.params.comment_id
+        )
+            .then(numRowsAffected => {
+                res.status(204).end()
+            })
+            .catch(next)
+    })
+    .patch(jsonParser, (req, res, next) => {
+        const {text, date_commented} = req.body
+        const commentToUpdate = {text, date_commented}
+        const numberOfValues = Object.values(commentToUpdate).filter(Boolean).length
+        if(numberOfValues === 0)
+            return res.status(400).json({
+                error: {
+                    message: `Request body must contain either 'text' or 'date_commented`
+                }
+            })
+        CommentsService.updateComment(
+            req.app.get('db'),
+            req.params.comment_id,
+            commentToUpdate
+        )
+            .then(numRowsAffected => {
+                res.status(204).end()
+            })
+            .catch(next)
+    })
+
+module.exports = commentsRouter
